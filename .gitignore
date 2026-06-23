@@ -1,0 +1,20 @@
+# Secrets locaux
+combo_api_key.txt
+.local/secrets/
+
+# PHP
+vendor/
+composer.lock
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,801 @@
+openapi: 3.0.1
+info:
+  title: ComboHR Partner API
+  description: API for ComboHR Partners to manage locations, contracts, plannings, and revenues.
+  version: v1
+servers:
+  - url: /
+    description: Current environment
+paths:
+  /api/v1/client_partners:
+    get:
+      tags:
+        - Client Partners
+      summary: List client partners
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Filter by client partner name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of client partners
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClientPartner'
+  /api/v1/client_partners/{client_partner_id}/employee_id_mappings:
+    get:
+      tags:
+        - Employee ID Mappings
+      summary: List employee ID mappings for a client partner
+      description: Returns all employee identification code mappings associated with a given client partner. Used when a client partner needs to reference employees using their own identification codes.
+      parameters:
+        - name: client_partner_id
+          in: path
+          required: true
+          description: Partner-scoped unique identifier for the client partner
+          schema:
+            type: string
+        - name: identification_code
+          in: query
+          required: false
+          description: Filter by a specific identification code
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of employee ID mappings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeIdMapping'
+    post:
+      tags:
+        - Employee ID Mappings
+      summary: Create or update an employee ID mapping
+      description: Creates a new employee ID mapping for the given membership and client partner. If a mapping already exists for that membership within this client partner, it will be updated with the new identification code.
+      parameters:
+        - name: client_partner_id
+          in: path
+          required: true
+          description: Partner-scoped unique identifier for the client partner
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeIdMappingInput'
+      responses:
+        '201':
+          description: Employee ID mapping created or updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeIdMapping'
+        '404':
+          description: Client partner or membership not found
+        '422':
+          description: Unprocessable Entity — validation failed
+  /api/v1/client_partners/{client_partner_id}/employee_id_mappings/{id}:
+    get:
+      tags:
+        - Employee ID Mappings
+      summary: Get a single employee ID mapping
+      parameters:
+        - name: client_partner_id
+          in: path
+          required: true
+          description: Partner-scoped unique identifier for the client partner
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          description: Partner-scoped unique identifier for the employee ID mapping
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The employee ID mapping
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeIdMapping'
+  /api/v1/locations:
+    get:
+      tags:
+        - Locations
+      summary: List locations
+      description: Returns all locations accessible to the current partner account, including their teams.
+      responses:
+        '200':
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Location'
+  /api/v1/contracts:
+    get:
+      tags:
+        - Contracts
+      summary: List contracts
+      description: Returns all contracts active at the given location, optionally filtered to a specific day.
+      parameters:
+        - name: location_id
+          in: query
+          required: true
+          description: Partner-scoped unique identifier for the location to filter contracts by
+          schema:
+            type: string
+        - name: day
+          in: query
+          required: false
+          description: Filter contracts active on this specific day (YYYY-MM-DD). Defaults to today.
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of contracts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contract'
+  /api/v1/contracts/{id}/history:
+    get:
+      tags:
+        - Contracts
+      summary: Get contract history
+      description: Returns the full history of an original contract, including the contract itself and all non-virtual amendments ordered chronologically.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Partner-scoped unique identifier of the original contract (not an amendment)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contract with its amendment history, or null when the contract is not found
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/ContractHistory'
+  /api/v1/past_contracts:
+    get:
+      tags:
+        - Contracts
+      summary: List ended contracts
+      description: >
+        Returns contracts whose contract_end date falls within the given date range.
+        For each ended contract, returns the last permanent amendment (virtual = false, no amendment_end),
+        or the original contract itself when no permanent amendment exists.
+        Results are paginated (50 per page) and ordered chronologically by contract_end.
+        start_date, end_date, and location_id are required.
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: Start of the date range (YYYY-MM-DD), inclusive, based on contract_end
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          description: End of the date range (YYYY-MM-DD), inclusive, based on contract_end
+          schema:
+            type: string
+            format: date
+        - name: location_id
+          in: query
+          required: true
+          description: Partner-scoped unique identifier of the location to filter results
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: Page number (default 1)
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Paginated list of ended contracts, or null when location_id is unknown
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/PastContractsResponse'
+        '422':
+          description: Unprocessable Entity — missing required parameters start_date, end_date, or location_id
+  /api/v1/plannings:
+    get:
+      tags:
+        - Plannings
+      summary: List plannings (shifts)
+      description: Returns all shifts for a given date range, optionally filtered by location or team.
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          description: Start of the date range (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: false
+          description: End of the date range (YYYY-MM-DD). Defaults to start_date if not provided.
+          schema:
+            type: string
+            format: date
+        - name: location_id
+          in: query
+          required: false
+          description: Partner-scoped unique identifier of the location to filter shifts by
+          schema:
+            type: string
+        - name: team_id
+          in: query
+          required: false
+          description: Partner-scoped unique identifier of the team to filter shifts by
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of shifts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Planning'
+  /api/v1/plannings/{id}:
+    get:
+      tags:
+        - Plannings
+      summary: Get a single planning (shift)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Partner-scoped unique identifier for the shift
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The shift object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Planning'
+  /api/v1/rests:
+    get:
+      tags:
+        - Rests
+      summary: List rests (absences / time off)
+      description: Returns all absence/rest events for a given location and date range.
+      parameters:
+        - name: location_id
+          in: query
+          required: true
+          description: Partner-scoped unique identifier for the location
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          required: true
+          description: Start of the date range (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: false
+          description: End of the date range (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of rest/absence events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rest'
+  /api/v1/revenues:
+    get:
+      tags:
+        - Revenues
+      summary: List revenues
+      description: Returns revenue entries for all locations in a given week.
+      parameters:
+        - name: week
+          in: query
+          required: true
+          description: Any date within the target week (YYYY-MM-DD). Returns revenues for the entire week containing this date.
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of revenue entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Revenue'
+    post:
+      tags:
+        - Revenues
+      summary: Create or update revenue
+      description: Creates or updates a revenue entry for a location on a specific date.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevenueInput'
+      responses:
+        '201':
+          description: Revenue entry created or updated successfully
+        '404':
+          description: Location not found
+        '422':
+          description: Unprocessable Entity — missing both amount and estimated_amount
+components:
+  schemas:
+    ClientPartner:
+      type: object
+      description: A third-party client partner account that can be associated with employees via identification code mappings.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier for this client partner
+        name:
+          type: string
+          description: Name of the client partner
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when this client partner was created
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when this client partner was last updated
+    EmployeeIdMapping:
+      type: object
+      description: A mapping between a ComboHR employee and a client partner's own identification code, allowing the client partner to reference employees using their own system's IDs.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier for this employee ID mapping
+        client_partner_id:
+          type: string
+          description: Partner-scoped unique identifier of the associated client partner
+        client_partner_name:
+          type: string
+          description: Name of the associated client partner
+        identification_code:
+          type: string
+          description: The external identification code used by the client partner to reference this employee
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when this mapping was created
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when this mapping was last updated
+    Location:
+      type: object
+      description: A workplace location accessible to the partner, containing one or more teams.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier for this location
+        name:
+          type: string
+          description: Name of the location
+        account_id:
+          type: string
+          description: Partner-scoped unique identifier for the account owning this location
+        partner_id:
+          type: string
+          description: Alias for id — the partner-scoped identifier
+        teams:
+          type: array
+          description: List of teams within this location. Returns an empty array if the location has only one team.
+          items:
+            $ref: '#/components/schemas/Team'
+    Team:
+      type: object
+      description: A team within a location, grouping employees for scheduling and reporting purposes.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier for this team
+        name:
+          type: string
+          description: Name of the team
+    PastContractsResponse:
+      type: object
+      description: Paginated response for the ended contracts endpoint.
+      properties:
+        contracts:
+          type: array
+          description: List of ended contracts (last permanent amendment or original contract)
+          items:
+            $ref: '#/components/schemas/Contract'
+        meta:
+          type: object
+          properties:
+            current_page:
+              type: integer
+              description: The current page number
+            has_next_page:
+              type: boolean
+              description: Whether there is at least one more page of results
+    Contract:
+      type: object
+      description: An employee contract record, including personal details, contract terms, and payroll information. Contracts and amendments share the same structure, with original_contract_id identifying the original contract in the lineage.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier of the contract
+        original_contract_id:
+          type: string
+          nullable: true
+          description: Partner-scoped identifier of the original contract in the contract lineage. This field may be populated for both original contracts and amendments; for original contracts, it is often equal to the contract's own id.
+        firstname:
+          type: string
+          nullable: true
+          description: First name of the employee (from membership, not versioned)
+        lastname:
+          type: string
+          nullable: true
+          description: Last name of the employee (from membership, not versioned)
+        birth_name:
+          type: string
+          nullable: true
+          description: Birth (maiden) name of the employee (not versioned)
+        email:
+          type: string
+          nullable: true
+          description: Email address of the employee (not versioned)
+        mobile_phone:
+          type: string
+          nullable: true
+          description: Mobile phone number of the employee (not versioned)
+        fixed_line_phone:
+          type: string
+          nullable: true
+          description: Fixed line phone number of the employee (not versioned)
+        social_security_number:
+          type: string
+          nullable: true
+          description: Social security number of the employee (not versioned)
+        citizenship:
+          type: string
+          nullable: true
+          description: Citizenship / nationality of the employee (not versioned)
+        street_address:
+          type: string
+          nullable: true
+          description: Street address of the employee (not versioned)
+        zip:
+          type: string
+          nullable: true
+          description: Postal/ZIP code of the employee's address (not versioned)
+        city:
+          type: string
+          nullable: true
+          description: City of the employee's address (not versioned)
+        country_of_residence:
+          type: string
+          nullable: true
+          description: Country of residence of the employee (not versioned)
+        role:
+          type: string
+          nullable: true
+          description: Role of the employee within the account (not versioned)
+        contract_type:
+          type: string
+          nullable: true
+          description: "Type of contract. One of: CDI, CDD, apprentissage, interim, seasonal, intern, extra, executive_officer_self_employed, executive_officer_as_employee"
+        contract_time:
+          type: number
+          nullable: true
+          description: Weekly contracted hours
+        working_days_in_week:
+          type: integer
+          nullable: true
+          description: Number of working days per week
+        function:
+          type: string
+          nullable: true
+          description: Job title / function of the employee
+        location_id:
+          type: string
+          nullable: true
+          description: Partner-scoped unique identifier for the location this contract is attached to
+        start_date:
+          type: string
+          format: date
+          nullable: true
+          description: Start date of the contract (or amendment period)
+        end_date:
+          type: string
+          format: date
+          nullable: true
+          description: End date of the contract (or amendment period). Null for open-ended contracts or permanent amendments.
+        hourly_gross_rate:
+          type: number
+          nullable: true
+          description: Computed hourly cost including employer social charges
+        monthly_gross_salary:
+          type: number
+          nullable: true
+          description: Monthly gross salary stored on the contract
+        hourly_gross_salary:
+          type: number
+          nullable: true
+          description: Hourly gross salary stored on the contract
+        daily_worker:
+          type: boolean
+          description: Whether the employee is on a forfait jour contract (daily rate, not tracking hours)
+        contract_end_reason:
+          type: string
+          nullable: true
+          description: >
+            Reason for contract termination. Null if the contract has not ended or no reason was specified.
+            One of: automatic_termination_art50, childcare_leave, collaborator_death, collective_termination,
+            conditions_modification, contract_change, contract_change_to_cdi, conventional_termination,
+            disciplinary_termination, discontinuous_work_end, dismissal, dismissal_due_to_closure,
+            dismissal_due_to_non_work_inaptitude, dismissal_due_to_work_inaptitude,
+            early_termination_by_employee, early_termination_by_employer, early_termination_due_to_closure,
+            early_termination_due_to_inaptitude, early_termination_for_gross_misconduct,
+            early_termination_for_serious_misconduct, economic_dismissal, end_of_activity,
+            end_of_employer_relationship, end_of_fixed_term_contract, end_of_temporary_disability,
+            end_trial_period_by_employee, end_trial_period_by_employer, family_care_leave, forced_leave,
+            forced_termination_of_mandate, force_majeure, gross_misconduct_dismissal, internal_transfer,
+            involuntary_termination, judicial_termination, location_change, merger_termination,
+            mutual_early_termination, objective_termination, other_causes, other_suspension,
+            professional_inadequacy_dismissal, resignation, resignation_or_termination, retirement,
+            retirement_or_volontary_retirement, seasonal_unemployment, serious_misconduct_dismissal,
+            simple_misconduct_dismissal, temporary_suspension_erte, termination, trial_period_failure,
+            voluntary_resignation_of_mandate, voluntary_retirement
+        employee_number:
+          type: string
+          nullable: true
+          description: The employee's internal identifier (employee ID) as set on their membership record.
+        employee_id_mappings:
+          type: array
+          description: Employee ID mappings linking this employee to client partner identification codes
+          items:
+            $ref: '#/components/schemas/EmployeeIdMapping'
+    Amendment:
+      allOf:
+        - $ref: '#/components/schemas/Contract'
+        - type: object
+          properties:
+            changes:
+              type: object
+              description: Only the fields modified by this amendment, using the same attribute names as the contract (e.g. {"contract_time":39} or {"monthly_gross_salary":2500})
+              additionalProperties: true
+    ContractHistory:
+      allOf:
+        - $ref: '#/components/schemas/Contract'
+        - type: object
+          properties:
+            amendments:
+              type: array
+              description: All non-virtual amendments ordered chronologically by start date
+              items:
+                $ref: '#/components/schemas/Amendment'
+    Planning:
+      type: object
+      description: A planned or completed shift assigned to an employee, including both scheduled times and actual clock-in/out data.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier for this shift
+        contract_id:
+          type: string
+          nullable: true
+          description: Partner-scoped unique identifier of the contract this shift is linked to
+        date:
+          type: string
+          format: date
+          description: Date of the shift (derived from starts_at)
+        starts_at:
+          type: string
+          format: date-time
+          description: Planned start datetime of the shift
+        ends_at:
+          type: string
+          format: date-time
+          description: Planned end datetime of the shift
+        break_duration:
+          type: integer
+          nullable: true
+          description: Planned break duration in minutes
+        real_starts_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Actual start datetime of the shift (null if employee did not show up)
+        real_ends_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Actual end datetime of the shift (null if employee did not show up)
+        real_break_duration:
+          type: integer
+          nullable: true
+          description: Actual break duration in minutes (null if employee did not show up)
+        note:
+          type: string
+          nullable: true
+          description: Planned note attached to the shift
+        real_note:
+          type: string
+          nullable: true
+          description: Note recorded at clock-out time
+        firstname:
+          type: string
+          nullable: true
+          description: First name of the employee assigned to this shift
+        lastname:
+          type: string
+          nullable: true
+          description: Last name of the employee assigned to this shift
+        employee_number:
+          type: string
+          nullable: true
+          description: Employee number (from membership)
+        location_id:
+          type: string
+          description: Partner-scoped unique identifier for the location of this shift
+        location_name:
+          type: string
+          nullable: true
+          description: Name of the location where this shift takes place
+        team_id:
+          type: string
+          nullable: true
+          description: Partner-scoped unique identifier for the team this shift is assigned to
+        team_name:
+          type: string
+          nullable: true
+          description: Name of the team this shift is assigned to
+        label_name:
+          type: string
+          nullable: true
+          description: Name of the label/tag applied to this shift (e.g. a job type or activity)
+        events:
+          type: array
+          description: Clock-in/clock-out events recorded for this shift (only included when explicitly requested)
+          items:
+            type: object
+            properties:
+              event_type:
+                type: string
+                description: "Type of clock event (e.g. clock_in, clock_out)"
+              recorded_at:
+                type: string
+                format: date-time
+                description: Timestamp when the event was recorded
+    Rest:
+      type: object
+      description: An absence or time-off event for an employee, such as paid leave, sick leave, or any other type of rest period.
+      properties:
+        id:
+          type: string
+          description: Partner-scoped unique identifier for this rest/absence
+        contract_id:
+          type: string
+          description: Partner-scoped unique identifier of the contract this rest belongs to
+        location_id:
+          type: string
+          description: Partner-scoped unique identifier of the location this rest belongs to
+        rest_type:
+          type: string
+          description: "Type of absence/rest (e.g. paid_leave, sick_leave, unpaid_leave, etc.)"
+        starts_at:
+          type: string
+          format: date-time
+          description: Start datetime of the rest/absence
+        ends_at:
+          type: string
+          format: date-time
+          description: End datetime of the rest/absence
+        custom_value:
+          type: number
+          nullable: true
+          description: Custom duration override in hours if the standard calculation is not applicable
+    Revenue:
+      type: object
+      description: A revenue entry for a location on a specific date, containing both estimated and actual amounts.
+      properties:
+        location_id:
+          type: string
+          description: Partner-scoped unique identifier for the location
+        location_name:
+          type: string
+          description: Name of the location
+        date:
+          type: string
+          format: date
+          description: Date of the revenue entry
+        estimated_amount:
+          type: number
+          nullable: true
+          description: Estimated/forecasted revenue amount for this date and location
+        actual_amount:
+          type: number
+          nullable: true
+          description: Actual recorded revenue amount for this date and location
+        automated_update:
+          type: boolean
+          description: Whether this revenue entry was updated automatically via an integration (e.g. POS system)
+    EmployeeIdMappingInput:
+      type: object
+      description: Request body for creating or updating an employee ID mapping between a membership and a client partner.
+      required:
+        - contract_id
+        - identification_code
+      properties:
+        contract_id:
+          type: string
+          description: Partner-scoped unique identifier of the original contract (not an amendment) — used to resolve the employee
+        identification_code:
+          type: string
+          description: The identification code used by the client partner to reference this employee
+    RevenueInput:
+      type: object
+      description: Request body for creating or updating a revenue entry for a location on a specific date.
+      required:
+        - location_id
+        - date
+      properties:
+        location_id:
+          type: string
+          description: Partner-scoped unique identifier for the location
+        date:
+          type: string
+          format: date
+          description: Date of the revenue entry (YYYY-MM-DD)
+        amount:
+          type: number
+          description: Actual revenue amount. At least one of amount or estimated_amount is required.
+        estimated_amount:
+          type: number
+          description: Estimated/forecasted revenue amount. At least one of amount or estimated_amount is required.
+  securitySchemes:
+    doorkeeper:
+      type: http
+      scheme: bearer
+security:
+  - doorkeeper: []
