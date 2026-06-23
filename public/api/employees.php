@@ -8,22 +8,44 @@ $location_name_filter = isset($_GET['location_name']) ? trim((string) $_GET['loc
 
 function resolve_api_key_file(string $location_name_filter): string
 {
-  $normalized = mb_strtolower($location_name_filter);
+  $normalized = function_exists('mb_strtolower')
+    ? mb_strtolower($location_name_filter)
+    : strtolower($location_name_filter);
 
   if ($normalized !== '' && strpos($normalized, 'beauvais') !== false) {
-    return '../../.local/secrets/combo_api_key_beauvais.txt';
+    return resolve_key_path('combo_api_key_beauvais.txt');
   }
 
-  return '../../.local/secrets/combo_api_key_gravigny.txt';
+  return resolve_key_path('combo_api_key_gravigny.txt');
+}
+
+function resolve_secrets_dirs(): array
+{
+  return [
+    __DIR__ . '/../../secrets',
+    __DIR__ . '/../../.local/secrets',
+  ];
+}
+
+function resolve_key_path(string $filename): string
+{
+  foreach (resolve_secrets_dirs() as $dir) {
+    $path = $dir . '/' . $filename;
+    if (@is_readable($path)) {
+      return $path;
+    }
+  }
+
+  return resolve_secrets_dirs()[0] . '/' . $filename;
 }
 
 function load_api_token(string $api_key_file): string
 {
-  if (!file_exists($api_key_file)) {
+  if (!@is_readable($api_key_file)) {
     return '';
   }
 
-  $lines = file($api_key_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  $lines = @file($api_key_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
   if ($lines === false) {
     return '';
   }

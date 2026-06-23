@@ -63,13 +63,67 @@ function getWeekDayLabel(dateString) {
   });
 }
 
+function getApiBaseUrl() {
+  let path = window.location.pathname;
+
+  // Si l'URL cible un fichier, on remonte au dossier parent.
+  if (!path.endsWith("/")) {
+    path = path.replace(/\/[^/]*$/, "/");
+  }
+
+  // Si on est servi depuis /public/, l'API est exposee au niveau racine projet.
+  if (path.endsWith("/public/")) {
+    path = `${path.slice(0, -8)}/`;
+  }
+
+  const normalized = path.replace(/\/+$/, "");
+  return normalized ? `${normalized}/api` : "/api";
+}
+
+function isDebugEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("debug") === "1";
+}
+
 function loadLocations(selectElement) {
-  fetch("/api/locations.php", {
+  const debug = isDebugEnabled();
+  const url = new URL(
+    `${getApiBaseUrl()}/locations.php`,
+    window.location.origin,
+  );
+  if (debug) {
+    url.searchParams.set("debug", "1");
+    console.info("[locations] debug active", {
+      href: window.location.href,
+      pathname: window.location.pathname,
+      apiBase: getApiBaseUrl(),
+      requestUrl: url.toString(),
+    });
+  }
+
+  fetch(url.toString(), {
     method: "GET",
     headers: { Accept: "application/json" },
   })
     .then(async (response) => {
-      const data = await response.json().catch(() => null);
+      const raw = await response.text();
+      let data = null;
+      try {
+        data = JSON.parse(raw);
+      } catch (_e) {
+        data = null;
+      }
+
+      if (debug) {
+        console.info("[locations] response", {
+          status: response.status,
+          ok: response.ok,
+          contentType: response.headers.get("content-type"),
+          rawPreview: raw.slice(0, 1500),
+          parsed: data,
+        });
+      }
+
       if (!response.ok || !data) {
         selectElement.innerHTML =
           '<option value="">Erreur au chargement</option>';
@@ -85,7 +139,10 @@ function loadLocations(selectElement) {
         selectElement.appendChild(option);
       });
     })
-    .catch(() => {
+    .catch((error) => {
+      if (debug) {
+        console.error("[locations] fetch failed", error);
+      }
       selectElement.innerHTML =
         '<option value="">Erreur au chargement</option>';
     });
@@ -172,25 +229,59 @@ function loadPlannings(
 
   const params = new URLSearchParams({ week_start: startDate });
   if (locationFilter) params.set("location_name", locationFilter);
+  const debug = isDebugEnabled();
+  const requestUrl = `${getApiBaseUrl()}/planning_proposal.php?${params.toString()}`;
 
-  fetch(`/api/planning_proposal.php?${params.toString()}`, {
+  if (debug) {
+    console.info("[planning] request", {
+      requestUrl,
+      locationFilter,
+      startDate,
+    });
+  }
+
+  fetch(requestUrl, {
     method: "GET",
     headers: { Accept: "application/json" },
   })
     .then(async (response) => {
-      const data = await response.json().catch(() => null);
+      const raw = await response.text();
+      let data = null;
+      try {
+        data = JSON.parse(raw);
+      } catch (_e) {
+        data = null;
+      }
+
+      if (debug) {
+        console.info("[planning] response", {
+          status: response.status,
+          ok: response.ok,
+          contentType: response.headers.get("content-type"),
+          rawPreview: raw.slice(0, 1500),
+          parsed: data,
+        });
+      }
+
       if (!response.ok) {
         throw new Error(
           data?.error ||
             `Erreur reseau: ${response.status} ${response.statusText}`,
         );
       }
+
+      if (!data) {
+        throw new Error(
+          `Reponse API invalide (JSON attendu). Apercu: ${raw.slice(0, 200)}`,
+        );
+      }
+
       return data;
     })
     .then((data) => {
       loadingDiv.style.display = "none";
 
-      if (data.error) {
+      if (data?.error) {
         errorDiv.textContent = `Erreur: ${data.error}`;
         errorDiv.style.display = "block";
         return;

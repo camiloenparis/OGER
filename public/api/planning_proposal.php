@@ -2,7 +2,7 @@
 
 header('Content-Type: application/json');
 
-require_once '../../engine/bootstrap.php';
+require_once __DIR__ . '/../../engine/bootstrap.php';
 
 // --- Helpers locaux (evite dependance cyclique avec employees.php) ---
 
@@ -18,10 +18,32 @@ function pp_load_token(string $file): string
 
 function pp_resolve_key_file(string $location_name): string
 {
-  $n = mb_strtolower($location_name);
+  $n = function_exists('mb_strtolower')
+    ? mb_strtolower($location_name)
+    : strtolower($location_name);
   return str_contains($n, 'beauvais')
-    ? '../../.local/secrets/combo_api_key_beauvais.txt'
-    : '../../.local/secrets/combo_api_key_gravigny.txt';
+    ? pp_resolve_key_path('combo_api_key_beauvais.txt')
+    : pp_resolve_key_path('combo_api_key_gravigny.txt');
+}
+
+function pp_resolve_secrets_dirs(): array
+{
+  return [
+    __DIR__ . '/../../secrets',
+    __DIR__ . '/../../.local/secrets',
+  ];
+}
+
+function pp_resolve_key_path(string $filename): string
+{
+  foreach (pp_resolve_secrets_dirs() as $dir) {
+    $path = $dir . '/' . $filename;
+    if (@is_readable($path)) {
+      return $path;
+    }
+  }
+
+  return pp_resolve_secrets_dirs()[0] . '/' . $filename;
 }
 
 function pp_combo_get(string $url, string $token): array
