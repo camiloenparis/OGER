@@ -1,6 +1,8 @@
 # Secrets locaux
 combo_api_key.txt
 .local/secrets/
+.local/admin/
+secrets/*.txt
 
 # PHP
 vendor/

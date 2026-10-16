@@ -17,7 +17,7 @@ applyTo: "**"
 
 # Preferences internes équipe vente
 
-- Alicia Robert, Stéphanie Aubry-Say et Erick Autin sont autorisés à ouvrir et fermer le magasin seuls
+-  Stéphanie Aubry-Say et Erick Autin sont autorisés à ouvrir et fermer le magasin seuls
 - Cassandra Bruhiere, Lea Serin, Cloe boulanger, Ludivine Gossuin, Axel Dorges et Amandine Evain sont autorisés à ouvrir le magasin, mais pour la fermeture, il faut qu'ils à deux (entre elles ou avec un autre employé autorisé à fermer le magasin)
 - Océane Coignard, Axel Dorges, Amandine Evain, Gjylfidone Bajraktaraj, Eléa Lefebvre, Charlotte Bauduin-Bance sont autorisé à travailler à partir de 4h30 am.
 - Ines de Jesus eet Jade le Fichous sont autorisés à travailler uniquement le samedi et le dimanche, mais pas en semaine.
