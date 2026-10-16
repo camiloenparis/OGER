@@ -26,6 +26,21 @@ Generation : engine/ProposalGenerator.php
 Regles : engine/rules/ ; enregistrement dans engine/bootstrap.php
 API : public/api/ ; interface : public/index.php, public/js/, public/css/
 
+Affectation des equipes : engine/TeamResolver.php. Les creneaux de la
+semaine choisie sont prioritaires ; pour les contrats sans equipe, recherche
+dans les huit semaines precedant la semaine cible ou la date du jour si
+elle est anterieure. Une affectation introuvable est signalee dans un groupe
+separe, sans horaires calcules pour la personne concernee. Les autres
+equipes restent affichees et leur planning continue a etre calcule.
+
+Le generateur applique les horaires de Carlos (02:00 ou 03:00), ses repos
+du lundi/mardi et l'heure minimale de Benoit (03:00). Il echange des repos
+de boulangers eligibles si necessaire pour couvrir 02:00, puis signale les
+manques persistants. Cela ne constitue pas une optimisation complete de
+tous les besoins horaires de la journee.
+
+Verification sans connexion Combo : php tests/planning-regression.php
+
 Configuration
 -------------
 Pour que ce projet fonctionne correctement, il faut ajouter les cles API

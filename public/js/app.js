@@ -161,14 +161,19 @@ function renderPlanning() {
         const hasHours = person.weekly_hours_proposed != null && person.weekly_hours_authorized != null;
         const delta = hasHours ? Number(person.weekly_hours_proposed) - Number(person.weekly_hours_authorized) : 0;
         const deltaLabel = `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${formatHours(Math.abs(delta))}`;
-        const days = dates.map((date, index) => {
+        const days = person.assignment_pending
+          ? '<td colspan="7" class="unassigned-note">Affectation à vérifier · aucun horaire calculé pour cette personne.</td>'
+          : dates.map((date, index) => {
           const shifts = Array.isArray(person.days?.[index]) ? person.days[index] : [];
           const chips = shifts.map((shift) => shift.rest
             ? '<div class="shift-chip rest">Repos hebdomadaire</div>'
             : `<div class="shift-chip"><span class="shift-team">${escapeHtml(team.team_name)}</span><span class="shift-hours">${escapeHtml(shift.label)}</span></div>`).join('');
           return `<td class="planning-day-cell${date === today ? ' today' : ''}">${chips}</td>`;
         }).join('');
-        rows += `<tr><th scope="row" class="employee-cell"><div class="employee-info"><span class="avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><div class="employee-name">${escapeHtml(name)}</div><div class="employee-hours">${formatHours(person.weekly_hours_proposed)} / ${formatHours(person.weekly_hours_authorized)}${hasHours ? `<span class="hours-delta${delta > 0 ? ' over' : ''}" title="Écart avec les heures du contrat">${deltaLabel}</span>` : ''}</div></div></div></th>${days}</tr>`;
+        const hoursLabel = person.assignment_pending
+          ? `Contrat : ${formatHours(person.weekly_hours_authorized)}`
+          : `${formatHours(person.weekly_hours_proposed)} / ${formatHours(person.weekly_hours_authorized)}`;
+        rows += `<tr><th scope="row" class="employee-cell"><div class="employee-info"><span class="avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><div class="employee-name">${escapeHtml(name)}</div><div class="employee-hours">${hoursLabel}${hasHours ? `<span class="hours-delta${delta > 0 ? ' over' : ''}" title="Écart avec les heures du contrat">${deltaLabel}</span>` : ''}</div></div></div></th>${days}</tr>`;
       });
     });
   });
@@ -182,6 +187,10 @@ function renderPlanning() {
   const violations = (state.data?.locations || []).flatMap((location) => (location.violations || []).map((v) => `${location.location_name} · ${v.employee || ''} · ${v.date || ''} : ${v.message}`));
   const alerts = [...errors, ...violations];
   $('planning-alerts').hidden = !alerts.length;
+  // Afficher immediatement les affectations manquantes et les ouvertures non couvertes.
+  $('planning-alerts').open = errors.length > 0 || (state.data?.locations || []).some((location) =>
+    (location.violations || []).some((violation) => ['staffing.bakery_02', 'team.unassigned'].includes(violation.rule)));
+  if (errors.length) showError(errors.join(' '));
   $('alerts-summary').textContent = `${alerts.length} point${alerts.length > 1 ? 's' : ''} à vérifier sur la proposition complète`;
   $('alerts-list').innerHTML = alerts.map((message) => `<li>${escapeHtml(message)}</li>`).join('');
 }

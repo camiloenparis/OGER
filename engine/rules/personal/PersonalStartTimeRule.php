@@ -23,6 +23,24 @@ class PersonalStartTimeRule implements RuleInterface
   public function getDescription(): string { return 'Contraintes d\'heure de debut individuelles.'; }
   public function getPriority(): int       { return 3; }
 
+  /** Applique les memes contraintes a la construction et a la validation. */
+  public static function preferredStart(string $name, int $desired): int
+  {
+    foreach (self::CONSTRAINTS as $key => $constraint) {
+      if (!str_contains(strtolower($name), $key)) continue;
+      $times = array_map(function ($time) {
+        [$hour, $minute] = explode(':', $time);
+        return (int) $hour * 60 + (int) $minute;
+      }, $constraint['times']);
+      if ($constraint['type'] === 'min') return max($desired, $times[0]);
+      foreach ($times as $time) {
+        if ($time >= $desired) return $time;
+      }
+      return max($times);
+    }
+    return $desired;
+  }
+
   public function evaluate(ShiftProposal $p, PlanningContext $ctx): ?RuleViolation
   {
     if ($p->is_rest_day || $p->start_time === null) {

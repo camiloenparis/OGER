@@ -1,3 +1,10 @@
+.unassigned-note {
+  padding: 18px;
+  color: #947849;
+  background: #fffcf6;
+  font-size: 12px;
+  vertical-align: middle;
+}
 :root{
   --ink:#20332e;
   --muted:#7b8581;
