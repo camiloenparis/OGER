@@ -71,11 +71,6 @@ function getApiBaseUrl() {
     path = path.replace(/\/[^/]*$/, "/");
   }
 
-  // Si on est servi depuis /public/, l'API est exposee au niveau racine projet.
-  if (path.endsWith("/public/")) {
-    path = `${path.slice(0, -8)}/`;
-  }
-
   const normalized = path.replace(/\/+$/, "");
   return normalized ? `${normalized}/api` : "/api";
 }

@@ -1,5 +1,6 @@
 ﻿<?php
 // Oger Planning - Point d'entree principal
+$assetPrefix = $assetPrefix ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -7,7 +8,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Oger Planning</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="<?= htmlspecialchars($assetPrefix, ENT_QUOTES, 'UTF-8') ?>css/style.css">
 </head>
 <body>
   <div class="container">
@@ -34,6 +35,6 @@
     </section>
   </div>
 
-  <script src="js/app.js"></script>
+  <script src="<?= htmlspecialchars($assetPrefix, ENT_QUOTES, 'UTF-8') ?>js/app.js"></script>
 </body>
 </html>
