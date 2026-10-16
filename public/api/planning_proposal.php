@@ -3,6 +3,7 @@
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../../engine/bootstrap.php';
+require_once __DIR__ . '/../../engine/TeamResolver.php';
 
 // --- Helpers locaux (evite dependance cyclique avec employees.php) ---
 
@@ -135,8 +136,7 @@ foreach ($locations as $location) {
         && (empty($end)   || $end   >= $week_start);
   }));
 
-  // Enrichir avec team_name depuis les plannings de la semaine courante
-  // (les contrats Combo ne portent pas directement team_name)
+  // Les contrats ne portent pas toujours leur equipe : consulter les creneaux.
   $plannings_res = pp_combo_get(
     "{$combo_url}/plannings?location_id=" . urlencode($loc_id)
     . "&start_date=" . urlencode($week_start)
@@ -144,34 +144,54 @@ foreach ($locations as $location) {
     $api_key
   );
 
-  $team_by_contract_id = [];
-  if ($plannings_res['ok'] && is_array($plannings_res['data'])) {
-    foreach ($plannings_res['data'] as $shift) {
-      $cid = (string) ($shift['contract_id'] ?? '');
-      if ($cid !== '' && !isset($team_by_contract_id[$cid])) {
-        $team_by_contract_id[$cid] = (string) ($shift['team_name'] ?? '');
-      }
+  $resolver = new TeamResolver();
+  $current_shifts = $plannings_res['ok'] && is_array($plannings_res['data']) ? $plannings_res['data'] : [];
+  $active = $resolver->resolve($active, $current_shifts, $location);
+  $history_error = '';
+  if (array_filter($active, fn ($emp) => $emp['team_name'] === '')) {
+    // Pour une semaine future vide, partir des affectations recentes reelles.
+    $history_end = min($week_start, date('Y-m-d'));
+    $history_start = (new DateTime($history_end))->modify('-8 weeks')->format('Y-m-d');
+    $history = pp_combo_get(
+      "{$combo_url}/plannings?location_id=" . urlencode($loc_id)
+      . '&start_date=' . urlencode($history_start) . '&end_date=' . urlencode($history_end),
+      $api_key
+    );
+    if ($history['ok'] && is_array($history['data'])) {
+      // Les equipes deja connues de la semaine cible restent prioritaires.
+      $active = $resolver->resolve($active, $history['data'], $location);
+    } else {
+      $history_error = ' Historique Combo indisponible : ' . ($history['error'] ?? 'reponse invalide') . '.';
     }
   }
 
-  foreach ($active as &$emp) {
-    $orig_id = (string) ($emp['original_contract_id'] ?? $emp['id'] ?? '');
-    $emp['team_name'] = $team_by_contract_id[$orig_id] ?? '';
-  }
-  unset($emp);
+  $unassigned = array_filter($active, fn ($emp) => $emp['team_name'] === '');
+  // Un contrat sans equipe ne doit pas bloquer les autres collaborateurs.
+  // Il reste visible a part, sans lui inventer des horaires ni un service.
+  $assigned = array_values(array_filter($active, fn ($emp) => $emp['team_name'] !== ''));
 
   // Filtrer par equipe si demande
   if (!empty($team_filter)) {
-    $active = array_values(array_filter(
-      $active,
+    $assigned = array_values(array_filter(
+      $assigned,
       fn ($c) => stripos((string) ($c['team_name'] ?? ''), $team_filter) !== false
     ));
   }
 
   // Generer les proposals et valider
-  $proposals = $generator->generate($active, $week_start, $loc_name);
+  if (!empty($team_filter)) $unassigned = [];
+  $proposals = $generator->generate($assigned, $week_start, $loc_name);
   $context   = new PlanningContext($week_start, $loc_name, $proposals);
   $violations = $engine->validate($proposals, $context);
+  $violations = array_merge($violations, $generator->openingViolations($proposals));
+  foreach ($unassigned as $emp) {
+    $name = trim(($emp['firstname'] ?? '') . ' ' . ($emp['lastname'] ?? ''));
+    $violations[] = new RuleViolation(
+      'team.unassigned',
+      'Equipe non identifiee : horaires non calcules pour cette personne. Le planning des autres equipes reste disponible.' . $history_error,
+      'warning', $name, $week_start
+    );
+  }
 
   $errors   = array_values(array_filter($violations, fn ($v) => $v->severity === 'error'));
   $warnings = array_values(array_filter($violations, fn ($v) => $v->severity === 'warning'));
@@ -268,6 +288,20 @@ foreach ($locations as $location) {
     ];
   }
 
+  if ($unassigned) {
+    $team_calendar[] = [
+      'team_name' => 'Affectation a verifier',
+      'employees' => array_map(fn ($emp) => [
+        'employee_id' => (string) ($emp['original_contract_id'] ?? $emp['id'] ?? ''),
+        'employee_name' => trim(($emp['firstname'] ?? '') . ' ' . ($emp['lastname'] ?? '')),
+        'weekly_hours_authorized' => isset($emp['contract_time']) ? (float) $emp['contract_time'] : null,
+        'weekly_hours_proposed' => null,
+        'assignment_pending' => true,
+        'days' => array_fill(0, 7, []),
+      ], array_values($unassigned)),
+    ];
+  }
+
   $result_locations[] = [
     'location_name'   => $loc_name,
     'week_start'      => $week_start,
@@ -276,7 +310,8 @@ foreach ($locations as $location) {
     'teams'           => $team_calendar,
     'violations'      => array_map(fn ($v) => $v->toArray(), $violations),
     'summary'         => [
-      'employees_count' => count($active),
+      'employees_count' => count($assigned) + count($unassigned),
+      'unassigned_count' => count($unassigned),
       'proposals_count' => count($proposals),
       'errors_count'    => count($errors),
       'warnings_count'  => count($warnings),

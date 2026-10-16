@@ -9,16 +9,6 @@
  */
 final class ProposalGenerator
 {
-  // Heure de debut par defaut selon l'equipe (cle: strtolower de team_name)
-  private const TEAM_START_TIMES = [
-    'boulangerie'        => '05:00',
-    'patisserie'         => '05:00',
-    'vente'              => '07:00',
-    'traiteur'           => '07:00',
-    'vente leroy merlin' => '07:00',
-  ];
-  private const DEFAULT_START = '07:00';
-
   private const STAFFING_FILE_MAP = [
     'boulangerie' => 'boulangerie.csv',
     'patisserie' => 'patisserie.csv',
@@ -48,20 +38,22 @@ final class ProposalGenerator
     $proposals  = [];
     $week_dates = $this->weekDates($week_start);
 
+    foreach ($employees as &$emp) {
+      $profile = $this->loadStaffingProfile((string) ($emp['team_name'] ?? ''));
+      $emp['_rest_days'] = $this->computeRestDays(
+        $emp, 7 - max(1, min(6, (int) ($emp['working_days_in_week'] ?? 5))), $profile['day_weights']
+      );
+    }
+    unset($emp);
+    $this->balanceBakeryOpening($employees);
+
     foreach ($employees as $emp) {
-      $working_days  = max(1, min(7, (int) ($emp['working_days_in_week'] ?? 5)));
-      $rest_day_count = 7 - $working_days;
+      $working_days  = 7 - count($emp['_rest_days']);
       $team       = (string) ($emp['team_name'] ?? '');
       $demand     = $this->loadStaffingProfile($team);
-      $rest_days  = $this->computeRestDays($emp, $rest_day_count, $demand['day_weights'] ?? []);
-
-      $team_lower = strtolower($team);
-      $start_time = self::TEAM_START_TIMES[$team_lower] ?? self::DEFAULT_START;
+      $rest_days  = $emp['_rest_days'];
 
       $weekly_hours  = (float) ($emp['contract_time'] ?? 35);
-      $daily_minutes = $working_days > 0 ? (int) round($weekly_hours * 60 / $working_days) : 420;
-      $break_minutes = $daily_minutes > 360 ? 30 : 0;
-      $end_time      = $this->addMinutes($start_time, $daily_minutes + $break_minutes);
 
       $contract_type = (string) ($emp['contract_type'] ?? '');
       $is_apprentice = stripos($contract_type, 'apprentissage') !== false
@@ -90,9 +82,8 @@ final class ProposalGenerator
         $duration_minutes = $window_minutes > 0
           ? min($daily_minutes, $window_minutes)
           : $daily_minutes;
-        $start_time_for_day = $first_active_hour !== null
-          ? sprintf('%02d:00', $first_active_hour)
-          : $start_time;
+        $desired_start = $this->startMinutesForEmployee($emp, $first_active_hour ?? 7);
+        $start_time_for_day = sprintf('%02d:%02d', intdiv($desired_start, 60), $desired_start % 60);
         $end_time_for_day = $this->addMinutes($start_time_for_day, $duration_minutes + ($is_rest ? 0 : $break_minutes));
 
         $proposals[] = new ShiftProposal(
@@ -102,7 +93,7 @@ final class ProposalGenerator
           contract_type:   $contract_type,
           weekly_hours_authorized: $weekly_hours_authorized,
           is_apprentice:   $is_apprentice,
-          is_minor:        false, // date de naissance non disponible via Combo contracts
+          is_minor:        !empty($emp['is_minor']),
           team:            $team,
           location:        $location_name,
           date:            $date,
@@ -133,9 +124,6 @@ final class ProposalGenerator
 
   private function computeRestDays(array $emp, int $rest_day_count, array $dayWeights = []): array
   {
-    if ($rest_day_count <= 0) {
-      return [];
-    }
     $pool = [
       ['name' => 'Monday', 'weight' => $dayWeights[0] ?? 0, 'index' => 0],
       ['name' => 'Tuesday', 'weight' => $dayWeights[1] ?? 0, 'index' => 1],
@@ -167,6 +155,7 @@ final class ProposalGenerator
       return $a['weight'] <=> $b['weight'];
     });
 
+    $rest_day_count = max($rest_day_count, count($personalRestDays));
     $selected = $personalRestDays;
     $remaining = array_values(array_filter(
       $pool,
@@ -204,9 +193,11 @@ final class ProposalGenerator
     $dayWeights = array_fill(0, 7, 0);
     $firstActiveHour = array_fill(0, 7, null);
     $lastActiveHour = array_fill(0, 7, null);
+    $needs = array_fill(0, 7, []);
 
     if (!file_exists($path)) {
       return [
+        'needs' => $needs,
         'day_weights' => $dayWeights,
         'first_active_hour' => $firstActiveHour,
         'last_active_hour' => $lastActiveHour,
@@ -216,6 +207,7 @@ final class ProposalGenerator
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if ($lines === false || count($lines) < 2) {
       return [
+        'needs' => $needs,
         'day_weights' => $dayWeights,
         'first_active_hour' => $firstActiveHour,
         'last_active_hour' => $lastActiveHour,
@@ -237,6 +229,7 @@ final class ProposalGenerator
 
       for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
         $need = (int) (($cols[$dayIndex + 1] ?? 0));
+        $needs[$dayIndex][$hour] = $need;
         $dayWeights[$dayIndex] += $need;
         if ($need > 0) {
           if ($firstActiveHour[$dayIndex] === null) {
@@ -248,6 +241,7 @@ final class ProposalGenerator
     }
 
     return [
+      'needs' => $needs,
       'day_weights' => $dayWeights,
       'first_active_hour' => $firstActiveHour,
       'last_active_hour' => $lastActiveHour,
@@ -262,7 +256,7 @@ final class ProposalGenerator
 
   private function normalizeTeamName(string $team): string
   {
-    $team = strtolower(trim($team));
+    $team = function_exists('mb_strtolower') ? mb_strtolower(trim($team), 'UTF-8') : strtolower(trim($team));
     $team = strtr($team, [
       'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
       'à' => 'a', 'â' => 'a', 'ä' => 'a',
@@ -281,4 +275,73 @@ final class ProposalGenerator
     $total   = (int) $h * 60 + (int) $m + $minutes;
     return sprintf('%02d:%02d', intdiv($total, 60) % 24, $total % 60);
   }
+  private function startMinutesForEmployee(array $emp, int $hour): int
+  {
+    $name = trim(($emp['firstname'] ?? '') . ' ' . ($emp['lastname'] ?? ''));
+    $start = PersonalStartTimeRule::preferredStart($name, $hour * 60);
+    $type = strtolower((string) ($emp['contract_type'] ?? ''));
+    if (str_contains($type, 'apprentissage') || str_contains($type, 'alternance')) {
+      $start = max($start, !empty($emp['is_minor']) ? 360 : 240);
+    }
+    return $start;
+  }
+
+  /** Echange des repos, sans changer leur nombre, pour couvrir le debut de production. */
+  private function balanceBakeryOpening(array &$employees): void
+  {
+    $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    $profile = $this->loadStaffingProfile('boulangerie');
+    $eligible = [];
+    foreach ($employees as $index => $emp) {
+      if ($this->normalizeTeamName((string) ($emp['team_name'] ?? '')) === 'boulangerie'
+          && $this->startMinutesForEmployee($emp, 2) <= 120) $eligible[] = $index;
+    }
+    $count = function (string $day) use (&$employees, $eligible): int {
+      return count(array_filter($eligible, fn ($index) => !in_array($day, $employees[$index]['_rest_days'], true)));
+    };
+    foreach ($days as $dayIndex => $day) {
+      $required = $profile['needs'][$dayIndex][2] ?? 0;
+      foreach ($eligible as $index) {
+        if ($count($day) >= $required) break;
+        $emp = $employees[$index];
+        if (!in_array($day, $emp['_rest_days'], true)) continue;
+        $personal = [];
+        foreach (self::PERSONAL_REST_DAYS as $name => $rests) {
+          if (str_contains(strtolower((string) ($emp['lastname'] ?? '')), $name)) $personal = $rests;
+        }
+        if (in_array($day, $personal, true)) continue;
+        foreach ($days as $otherIndex => $otherDay) {
+          if (!in_array($otherDay, $emp['_rest_days'], true)
+              && $count($otherDay) > ($profile['needs'][$otherIndex][2] ?? 0)) {
+            $position = array_search($day, $emp['_rest_days'], true);
+            $employees[$index]['_rest_days'][$position] = $otherDay;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  /** Signale une ouverture de production impossible avec les effectifs disponibles. */
+  public function openingViolations(array $proposals): array
+  {
+    $groups = [];
+    foreach ($proposals as $proposal) {
+      if ($this->normalizeTeamName($proposal->team) === 'boulangerie') $groups[$proposal->date][] = $proposal;
+    }
+    $profile = $this->loadStaffingProfile('boulangerie');
+    $violations = [];
+    foreach ($groups as $date => $shifts) {
+      $day = (int) (new DateTime($date))->format('N') - 1;
+      $required = $profile['needs'][$day][2] ?? 0;
+      $present = count(array_filter($shifts, fn ($shift) => !$shift->is_rest_day
+        && $shift->startMinutes() <= 120 && $shift->endMinutes() > 120));
+      if ($present < $required) $violations[] = new RuleViolation(
+        'staffing.bakery_02', "Boulangerie a 02:00 : {$present} personne(s) presente(s), {$required} requise(s). Aucun remplacement compatible disponible.",
+        'error', 'Equipe Boulangerie', $date
+      );
+    }
+    return $violations;
+  }
+
 }
