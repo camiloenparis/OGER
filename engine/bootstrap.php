@@ -10,7 +10,9 @@
  */
 
 // Core
+require_once __DIR__ . '/PlanningSettings.php';
 require_once __DIR__ . '/rules/RuleInterface.php';
+require_once __DIR__ . '/rules/ConfiguredRule.php';
 require_once __DIR__ . '/rules/RuleViolation.php';
 require_once __DIR__ . '/ShiftProposal.php';
 require_once __DIR__ . '/PlanningContext.php';
@@ -42,6 +44,12 @@ require_once __DIR__ . '/rules/personal/WeekdayRestrictionRule.php';
 function create_rule_registry(): RuleRegistry
 {
   $registry = new RuleRegistry();
+  if (isset(PlanningSettings::snapshot()['activated_at'])) {
+    foreach (['hours','break','apprentice','rest','consecutive','preferences','opening','closing'] as $kind) {
+      $registry->register(new ConfiguredRule($kind));
+    }
+    return $registry;
+  }
 
   // Regles RH
   $registry->register(new MaxDailyHoursRule());

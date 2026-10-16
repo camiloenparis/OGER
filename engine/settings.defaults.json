@@ -1,0 +1,413 @@
+{
+    "hr": {
+        "max_daily_hours": 10,
+        "max_consecutive_days": 6,
+        "break_after_minutes": 360,
+        "break_minutes": 30,
+        "min_rest_minutes": 660,
+        "apprentice_adult_start": "04:00",
+        "apprentice_minor_start": "06:00",
+        "prefer_consecutive_rest": true
+    },
+    "stores": [
+        {
+            "teams": [
+                "boulangerie",
+                "patisserie",
+                "traiteur",
+                "vente"
+            ],
+            "weekday_open": "06:00",
+            "weekday_close": "20:00",
+            "sunday_open": "07:00",
+            "sunday_close": "20:00"
+        },
+        {
+            "teams": [
+                "leroy-merlin"
+            ],
+            "weekday_open": "07:00",
+            "weekday_close": "20:00",
+            "sunday_open": "08:00",
+            "sunday_close": "18:00"
+        }
+    ],
+    "employees": [
+        {
+            "name_match": "rebouco",
+            "teams": [
+                "boulangerie"
+            ],
+            "rest_days": [
+                "Monday",
+                "Tuesday"
+            ],
+            "allowed_days": [],
+            "start_times": [
+                "02:00",
+                "03:00"
+            ],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "desaint",
+            "teams": [
+                "boulangerie"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "03:00",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "zeghad",
+            "teams": [
+                "traiteur"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": 6,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "robert",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "aubry",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "autin",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "bruhiere",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "partner"
+        },
+        {
+            "name_match": "serin",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "partner"
+        },
+        {
+            "name_match": "boulanger",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "partner"
+        },
+        {
+            "name_match": "gossuin",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "partner"
+        },
+        {
+            "name_match": "dorges",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "partner"
+        },
+        {
+            "name_match": "evain",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "partner"
+        },
+        {
+            "name_match": "coignard",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "04:30",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "dorges",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "04:30",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "evain",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "04:30",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "bajraktaraj",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "04:30",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "lefebvre",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "04:30",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "bauduin-bance",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": "04:30",
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "de jesus",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [
+                "Saturday",
+                "Sunday"
+            ],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "fichous",
+            "teams": [
+                "vente"
+            ],
+            "rest_days": [],
+            "allowed_days": [
+                "Saturday",
+                "Sunday"
+            ],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": null,
+            "closing": "unspecified"
+        },
+        {
+            "name_match": "autin",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "bruhiere",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "serin",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "boulanger",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "gossuin",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "dorges",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "evain",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "solo"
+        },
+        {
+            "name_match": "richard",
+            "teams": [
+                "leroy-merlin"
+            ],
+            "rest_days": [],
+            "allowed_days": [],
+            "start_times": [],
+            "earliest_start": null,
+            "max_daily_hours": null,
+            "can_open": true,
+            "closing": "forbidden"
+        }
+    ]
+}

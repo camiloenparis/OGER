@@ -16,6 +16,7 @@ $assetPrefix = $assetPrefix ?? '';
     <nav aria-label="Navigation principale">
       <a class="nav-active" href="#planning-builder-section" aria-current="page">Plannings</a>
       <a href="#team-filter">Équipes</a>
+      <a href="admin.php">Admin</a>
     </nav>
     <span class="workspace-name">Organisation des équipes</span>
     <span class="avatar" aria-label="Oger Planning">OG</span>

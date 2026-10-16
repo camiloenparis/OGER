@@ -9,24 +9,6 @@
  */
 final class ProposalGenerator
 {
-  private const STAFFING_FILE_MAP = [
-    'boulangerie' => 'boulangerie.csv',
-    'patisserie' => 'patisserie.csv',
-    'traiteur' => 'traiteur.csv',
-    'vente' => 'vente.csv',
-    'leroy-merlin' => 'leroy-merlin.csv',
-    'vente leroy merlin' => 'leroy-merlin.csv',
-  ];
-
-  /**
-   * Jours de repos personnels connus.
-   * MAINTENIR SYNCHRONISE avec engine/rules/personal/PersonalRestDayRule.php
-   * Format: partial_lastname_lower => [day_names_anglais]
-   */
-  private const PERSONAL_REST_DAYS = [
-    'rebouco' => ['Monday', 'Tuesday'],
-  ];
-
   /**
    * Genere un ShiftProposal par employe par jour de la semaine.
    *
@@ -41,7 +23,7 @@ final class ProposalGenerator
     foreach ($employees as &$emp) {
       $profile = $this->loadStaffingProfile((string) ($emp['team_name'] ?? ''));
       $emp['_rest_days'] = $this->computeRestDays(
-        $emp, 7 - max(1, min(6, (int) ($emp['working_days_in_week'] ?? 5))), $profile['day_weights']
+        $emp, 7 - max(1, min(PlanningSettings::hr('max_consecutive_days'), (int) ($emp['working_days_in_week'] ?? 5))), $profile['day_weights']
       );
     }
     unset($emp);
@@ -75,10 +57,14 @@ final class ProposalGenerator
         }
 
         $daily_minutes = $working_days > 0 ? (int) round($weekly_hours * 60 / $working_days) : 420;
+        $daily_minutes = min($daily_minutes, (int) round(PlanningSettings::hr('max_daily_hours') * 60));
+        foreach (PlanningSettings::preferences($employee_name, $team) as $preference) {
+          if ($preference['max_daily_hours'] !== null) $daily_minutes = min($daily_minutes, (int) round($preference['max_daily_hours'] * 60));
+        }
         $window_minutes = ($first_active_hour !== null && $last_active_hour !== null)
           ? max(60, (($last_active_hour + 1) - $first_active_hour) * 60)
           : 0;
-        $break_minutes = $daily_minutes > 360 ? 30 : 0;
+        $break_minutes = intdiv($daily_minutes, PlanningSettings::hr('break_after_minutes')) * PlanningSettings::hr('break_minutes');
         $duration_minutes = $window_minutes > 0
           ? min($daily_minutes, $window_minutes)
           : $daily_minutes;
@@ -134,14 +120,7 @@ final class ProposalGenerator
       ['name' => 'Sunday', 'weight' => $dayWeights[6] ?? 0, 'index' => 6],
     ];
 
-    $last_lower = strtolower((string) ($emp['lastname'] ?? ''));
-    $personalRestDays = [];
-    foreach (self::PERSONAL_REST_DAYS as $key => $preferred) {
-      if (str_contains($last_lower, $key)) {
-        $personalRestDays = $preferred;
-        break;
-      }
-    }
+    $personalRestDays = PlanningSettings::rests(trim(($emp['firstname'] ?? '') . ' ' . ($emp['lastname'] ?? '')), (string) ($emp['team_name'] ?? ''));
 
     usort($pool, function (array $a, array $b) use ($personalRestDays) {
       $aPersonal = in_array($a['name'], $personalRestDays, true);
@@ -174,6 +153,16 @@ final class ProposalGenerator
     ));
     $offset = abs((int) crc32($employeeSeed)) % count($remaining);
 
+    // Preference souple : chercher deux jours consecutifs si aucun repos impose.
+    if (!$selected && $rest_day_count === 2 && PlanningSettings::hr('prefer_consecutive_rest')) {
+      for ($i = 0; $i < count($remaining); $i++) {
+        $day = $remaining[($offset + $i) % count($remaining)];
+        foreach ($remaining as $next) {
+          if ($next['index'] === $day['index'] + 1) return [$day['name'], $next['name']];
+        }
+      }
+    }
+
     for ($i = 0; count($selected) < $rest_day_count && $i < count($remaining); $i++) {
       $day = $remaining[($offset + $i) % count($remaining)];
       if (count($selected) >= $rest_day_count) {
@@ -187,15 +176,14 @@ final class ProposalGenerator
 
   private function loadStaffingProfile(string $team): array
   {
-    $csvFile = $this->resolveStaffingCsvFile($team);
-    $path = __DIR__ . '/../data/planning/besoins/' . $csvFile;
+    $csv = PlanningSettings::snapshot()['staffing'][PlanningSettings::team($team)] ?? null;
 
     $dayWeights = array_fill(0, 7, 0);
     $firstActiveHour = array_fill(0, 7, null);
     $lastActiveHour = array_fill(0, 7, null);
     $needs = array_fill(0, 7, []);
 
-    if (!file_exists($path)) {
+    if ($csv === null) {
       return [
         'needs' => $needs,
         'day_weights' => $dayWeights,
@@ -204,7 +192,7 @@ final class ProposalGenerator
       ];
     }
 
-    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $lines = preg_split('/\r?\n/', trim($csv));
     if ($lines === false || count($lines) < 2) {
       return [
         'needs' => $needs,
@@ -222,7 +210,7 @@ final class ProposalGenerator
       }
 
       preg_match('/(\d+)/', (string) ($cols[0] ?? ''), $m);
-      if (empty($m[1])) {
+      if (!isset($m[1])) {
         continue;
       }
       $hour = (int) $m[1];
@@ -246,12 +234,6 @@ final class ProposalGenerator
       'first_active_hour' => $firstActiveHour,
       'last_active_hour' => $lastActiveHour,
     ];
-  }
-
-  private function resolveStaffingCsvFile(string $team): string
-  {
-    $normalized = $this->normalizeTeamName($team);
-    return self::STAFFING_FILE_MAP[$normalized] ?? 'vente.csv';
   }
 
   private function normalizeTeamName(string $team): string
@@ -278,10 +260,10 @@ final class ProposalGenerator
   private function startMinutesForEmployee(array $emp, int $hour): int
   {
     $name = trim(($emp['firstname'] ?? '') . ' ' . ($emp['lastname'] ?? ''));
-    $start = PersonalStartTimeRule::preferredStart($name, $hour * 60);
+    $start = PlanningSettings::preferredStart($name, $hour * 60, (string) ($emp['team_name'] ?? ''));
     $type = strtolower((string) ($emp['contract_type'] ?? ''));
     if (str_contains($type, 'apprentissage') || str_contains($type, 'alternance')) {
-      $start = max($start, !empty($emp['is_minor']) ? 360 : 240);
+      $start = max($start, PlanningSettings::minutes(PlanningSettings::hr(!empty($emp['is_minor']) ? 'apprentice_minor_start' : 'apprentice_adult_start')));
     }
     return $start;
   }
@@ -305,10 +287,7 @@ final class ProposalGenerator
         if ($count($day) >= $required) break;
         $emp = $employees[$index];
         if (!in_array($day, $emp['_rest_days'], true)) continue;
-        $personal = [];
-        foreach (self::PERSONAL_REST_DAYS as $name => $rests) {
-          if (str_contains(strtolower((string) ($emp['lastname'] ?? '')), $name)) $personal = $rests;
-        }
+        $personal = PlanningSettings::rests(trim(($emp['firstname'] ?? '') . ' ' . ($emp['lastname'] ?? '')), (string) ($emp['team_name'] ?? ''));
         if (in_array($day, $personal, true)) continue;
         foreach ($days as $otherIndex => $otherDay) {
           if (!in_array($otherDay, $emp['_rest_days'], true)
